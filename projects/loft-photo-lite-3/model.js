@@ -1,21 +1,95 @@
 export default {
-  getRandomElement(array) {},
+  getRandomElement(array) {
+    if (!array.length) {
+      return null;
+    }
+    const index = Math.round(Math.random() * (array.lendth -1));
 
-  async getNextPhoto() {},
+    return array[index]; 
+  },
 
-  login() {},
+  async getNextPhoto() {
+    const friend = this.getRandomElement(this.friends.items);
+    const photos = await this.getFriendPhotos(friend.id);
+    const photo = this.getRandomElement(photos.items);
+    const size = this.findSize(photo);
 
-  init() {},
+    return { friend, id: photo.id, url: size.url};
+  },
 
-  photoCache: {},
-  getFriendPhotos(id) {
-    const photos = this.photoCache[id];
+  findSize(photo) {
+    const size = photo.sizes.find((size) => size.width >= 360);
+
+    if (!size) {
+      return photo.sizes.reduce((biggest, current) => {
+        if (current.width > biggest.width) {
+          return current;
+        }
+        return biggest;
+      }, photo.sizes[0]);
+    }
+    return size;
+  },
+  
+  async init() {
+    this.photoCache = {};
+    this.friends = await this.getFriends();
+  },
+
+  login() {
+    return new Promise((resolve, reject) => {
+      VK.init({
+        apiId: APP_ID,
+      });
+      VK.Auth.login((response) => {
+        if (response.session) {
+          resolve(response);
+        } else {
+          console.error(response);
+          reject(responce);
+        }
+      }, PERM_FRIENDS | PERM_PHOTOS);
+    });
+  },
+
+  logout() {},
+
+  callApi(method, params) {
+    params.v = params.v || '5.120';
+
+    return new Promise((resolve, reject) => {
+      VK.api(method, params, (response) => {
+        if (response.error) {
+          reject(new Error(response.error.error_msg));
+        } else {
+          resolve(response.response);
+        }
+      });
+    });
+  },
+
+
+  getFriends() {
+    const params = {
+      fields: ['photo_50', 'photo_100'],
+    };
+    return this.callApi('friends.get', params);
+  },
+
+  getPhotos(owner) {
+    const params = {
+      owner_id: owner,
+    };
+    return this.callApi('photos.getAll', params);
+  },
+
+  async getFriendPhotos(id) {
+    let photos = this.photoCache[id];
 
     if (photos) {
       return photos;
     }
-
-    // const photos = вместо этого комментария вставьте код для получения фотографии друга из ВК
+    photos = await this.getPhotos(id);
 
     this.photoCache[id] = photos;
 
